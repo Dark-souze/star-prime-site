@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "node scripts/lint.mjs",
-    "push": "npm version patch -m \"chore(release): Atualização para a versão %s\" && git push --follow-tags"
+    "lint": "node scripts/lint.mjs"
   },
   "dependencies": {
     "@upstash/ratelimit": "^2.0.8",
