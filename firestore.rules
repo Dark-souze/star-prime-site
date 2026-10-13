@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Website writes go through the protected server route using Firebase Admin.
+    // Admin SDK access is governed by Google Cloud IAM, not these client rules.
+    match /orcamentos/{document} {
+      allow read, write: if false;
+    }
+  }
+}
