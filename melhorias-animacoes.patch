@@ -1,0 +1,844 @@
+diff --git a/app/contactos/page.jsx b/app/contactos/page.jsx
+index ea1629f..44f0bfd 100644
+--- a/app/contactos/page.jsx
++++ b/app/contactos/page.jsx
+@@ -4,6 +4,7 @@ import Image from 'next/image';
+ import { Phone, Mail, MapPin, ArrowUpRight, Globe2, Fingerprint } from 'lucide-react';
+ import { SectionEyebrow } from '@/components/DesignPrimitives';
+ import Reveal from '@/components/Reveal';
++import ScrollImage from '@/components/ScrollImage';
+ import QuoteForm from '@/components/QuoteForm';
+ import { COMPANY, getWhatsAppLink, SOBRE_IMAGE } from '@/lib/content';
+ import { useLocale, useT } from '@/components/LocaleProvider';
+@@ -26,8 +27,10 @@ export default function ContactosPage() {
+           <h1 className="max-w-[10ch] font-display text-[clamp(3.25rem,6vw,6rem)] font-bold leading-[.88] tracking-[-.07em]">{t('contacts.title')}</h1>
+           <p className="mt-7 max-w-md text-base leading-relaxed text-white/65">{t('contacts.intro')}</p>
+         </Reveal>
+-        <Reveal immediate delay={.12} className="group relative aspect-[5/3] min-h-64 overflow-hidden border border-white/15 sm:min-h-80 lg:min-h-[30rem]">
+-          <Image src={SOBRE_IMAGE} alt={t('contacts.imageAlt')} fill priority sizes="(min-width: 1024px) 42vw, 100vw" className="object-cover object-center opacity-85" />
++        <Reveal immediate variant="mask" delay={.15} className="group relative aspect-[5/3] min-h-64 overflow-hidden border border-white/15 sm:min-h-80 lg:min-h-[30rem]">
++          <ScrollImage reveal={false} className="absolute inset-0">
++            <Image src={SOBRE_IMAGE} alt={t('contacts.imageAlt')} fill loading="eager" fetchPriority="high" sizes="(min-width: 1024px) 42vw, 100vw" className="object-cover object-center opacity-85" />
++          </ScrollImage>
+           <div className="absolute inset-0 bg-linear-to-t from-graphite-950/80 via-transparent to-graphite-950/10" />
+           <div className="absolute bottom-5 left-5 flex items-center gap-3 font-mono-tech text-[10px] tracking-[.15em] text-gold-300"><span className="h-px w-8 bg-gold-400" />{t('contacts.imageCaption')}</div>
+         </Reveal>
+diff --git a/app/globals.css b/app/globals.css
+index b501f77..811ab3a 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -20,12 +20,16 @@
+ }
+ 
+ :root {
++  --ease-out: cubic-bezier(.16, 1, .3, 1);
++  --ease-in-out: cubic-bezier(.76, 0, .24, 1);
++  --reveal-distance: 22px;
+   --line: rgba(41, 63, 80, .16);
+   --font-display-family: "Arial Narrow", "Trebuchet MS", Arial, sans-serif;
+   --font-body-family: Arial, Helvetica, sans-serif;
+   --font-mono-tech-family: "Courier New", Courier, monospace;
+ }
+-html { scroll-behavior: smooth; background: var(--color-cream-50); }
++/* Sem scroll-behavior: smooth — o Lenis trata do scroll suave e os dois em conjunto provocam solavancos. */
++html { background: var(--color-cream-50); }
+ body { overscroll-behavior-y: none; }
+ 
+ h1, h2, h3 { text-wrap: balance; }
+@@ -44,8 +48,30 @@ h1, h2, h3 { text-wrap: balance; }
+ .image-reveal-color { filter: grayscale(1) saturate(.7); transition: filter .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
+ .group:hover .image-reveal-color { filter: grayscale(0) saturate(1); transform: scale(1.02); }
+ .nav-link { position: relative; }
+-.nav-link::after { content: ''; position: absolute; bottom: -8px; left: 0; height: 1px; width: 0; background: #bd9856; transition: width .25s ease; }
+-.nav-link:hover::after, .nav-link-active::after { width: 100%; }
++.nav-link::after { content: ''; position: absolute; bottom: -8px; left: 0; right: 0; height: 1px; background: #bd9856; transform: scaleX(0); transform-origin: right; transition: transform .45s var(--ease-out); }
++.nav-link:hover::after, .nav-link-active::after { transform: scaleX(1); transform-origin: left; }
++
++/* ── Motion ───────────────────────────────────────────────────────────────
++   Entradas do hero (Reveal com `immediate`): feitas em CSS, arrancam no primeiro paint.
++   As restantes animações acompanham o scroll (Reveal e ScrollImage, com Motion).
++   Fill "backwards": no fim não deixam transform/opacity presos e os hovers funcionam. */
++@keyframes reveal-rise { from { opacity: 0; transform: translate3d(0, var(--reveal-distance), 0); } }
++@keyframes reveal-mask { from { clip-path: inset(100% 0 0 0); } }
++@keyframes reveal-zoom { from { transform: scale(1.12); } }
++@keyframes hero-settle { from { transform: scale(1.08); } }
++
++@media (prefers-reduced-motion: no-preference) {
++  [data-reveal="fade"][data-reveal-load] {
++    animation: reveal-rise 1s var(--ease-out) var(--reveal-delay, 0s) backwards;
++  }
++  [data-reveal="mask"][data-reveal-load] {
++    animation: reveal-mask 1.25s var(--ease-in-out) var(--reveal-delay, 0s) backwards;
++  }
++  [data-reveal="mask"][data-reveal-load] > * {
++    animation: reveal-zoom 1.8s var(--ease-out) var(--reveal-delay, 0s) backwards;
++  }
++  .hero-settle { animation: hero-settle 2.6s var(--ease-out) backwards; }
++}
+ 
+ @media (prefers-reduced-motion: reduce) {
+   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+diff --git a/app/layout.js b/app/layout.js
+index b171414..414f628 100644
+--- a/app/layout.js
++++ b/app/layout.js
+@@ -1,3 +1,4 @@
++import 'lenis/dist/lenis.css';
+ import './globals.css';
+ import Navbar from '@/components/Navbar';
+ import Footer from '@/components/Footer';
+@@ -61,6 +62,8 @@ export default function RootLayout({ children }) {
+           },
+           areaServed: { '@type': 'Country', name: 'Angola' },
+         }) }} />
++        {/* Sem JavaScript, os elementos com entrada animada ficam visíveis de imediato. */}
++        <noscript><style>{'[data-reveal]{opacity:1!important;clip-path:none!important;transform:none!important;animation:none!important}'}</style></noscript>
+         <LocaleProvider>
+           <GrainOverlay />
+           <LenisProvider>
+diff --git a/app/page.jsx b/app/page.jsx
+index 500c158..70dc5b7 100644
+--- a/app/page.jsx
++++ b/app/page.jsx
+@@ -1,11 +1,15 @@
+ 'use client';
+ 
++import { useRef } from 'react';
+ import Link from 'next/link';
++import { motion, useScroll } from 'motion/react';
+ import Image from 'next/image';
+ import { ArrowUpRight, ArrowDownRight, ClipboardList, Hammer, HardHat, MapPin, Ruler } from 'lucide-react';
+ import QuoteForm from '@/components/QuoteForm';
+ import WhatsAppButton from '@/components/WhatsAppButton';
+ import Reveal from '@/components/Reveal';
++import ScrollImage from '@/components/ScrollImage';
++import { useScrollValue } from '@/components/useScrollMotion';
+ import { COMPANY, SERVICES, PROJECTS, HERO_IMAGE, SOBRE_IMAGE } from '@/lib/content';
+ import { useT } from '@/components/LocaleProvider';
+ import { categoryKey } from '@/lib/i18n';
+@@ -16,28 +20,38 @@ function Label({ children, dark = false }) { return <p className={`mb-5 font-mon
+ 
+ export default function Home() {
+   const t = useT();
++  const heroRef = useRef(null);
++  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
++  // Ao descer: a fotografia desliza mais devagar do que a página e aproxima-se,
++  // e o texto sobe e desvanece — o hero "fica para trás" ao ritmo do scroll.
++  const heroImageY = useScrollValue(scrollYProgress, [0, 1], ['0%', '14%'], '0%');
++  const heroImageScale = useScrollValue(scrollYProgress, [0, 1], [1, 1.08], 1);
++  const heroTextY = useScrollValue(scrollYProgress, [0, 0.7], [0, -90], 0);
++  const heroTextOpacity = useScrollValue(scrollYProgress, [0.1, 0.65], [1, 0], 1);
+ 
+   return <main className="overflow-hidden">
+-    <section className="relative min-h-175 bg-graphite-950 pt-19 text-off-white lg:min-h-190">
+-      <Image src={HERO_IMAGE} alt={t('home.heroAlt')} fill priority sizes="100vw" className="object-cover object-center opacity-80" />
++    <section ref={heroRef} className="relative min-h-175 overflow-hidden bg-graphite-950 pt-19 text-off-white lg:min-h-190">
++      <motion.div className="absolute inset-x-0 -top-[14%] bottom-0" style={{ y: heroImageY, scale: heroImageScale }}>
++        <Image src={HERO_IMAGE} alt={t('home.heroAlt')} fill preload sizes="100vw" className="hero-settle object-cover object-center opacity-80" />
++      </motion.div>
+       <div className="image-shade absolute inset-0" />
+       <div className="absolute inset-x-0 bottom-0 h-44 bg-linear-to-t from-graphite-950 to-transparent" />
+-      <div className="relative mx-auto flex min-h-156 max-w-360 flex-col justify-end px-5 pb-12 lg:min-h-171 lg:px-10 lg:pb-16">
+-        <Reveal immediate className="max-w-3xl">
+-          <Label dark>{t('home.heroEyebrow')}</Label>
+-          <h1 className="max-w-3xl font-display text-[clamp(3rem,6.2vw,6.35rem)] font-bold leading-[.91] tracking-[-.065em]">{t('home.heroTitle')}</h1>
+-          <p className="mt-7 max-w-lg text-base leading-relaxed text-white/75">{t('home.heroDescription')}</p>
+-          <div className="mt-9 flex flex-wrap gap-3">
++      <motion.div style={{ y: heroTextY, opacity: heroTextOpacity }} className="relative mx-auto flex min-h-156 max-w-360 flex-col justify-end px-5 pb-12 lg:min-h-171 lg:px-10 lg:pb-16">
++        <div className="max-w-3xl">
++          <Reveal immediate delay={0.15}><Label dark>{t('home.heroEyebrow')}</Label></Reveal>
++          <Reveal immediate delay={0.25}><h1 className="max-w-3xl font-display text-[clamp(3rem,6.2vw,6.35rem)] font-bold leading-[.91] tracking-[-.065em]">{t('home.heroTitle')}</h1></Reveal>
++          <Reveal immediate delay={0.4}><p className="mt-7 max-w-lg text-base leading-relaxed text-white/75">{t('home.heroDescription')}</p></Reveal>
++          <Reveal immediate delay={0.52} className="mt-9 flex flex-wrap gap-3">
+             <WhatsAppButton className="min-h-0! rounded-none! px-5! py-4!">{t('home.talkProject')}</WhatsAppButton>
+-            <Link href="/portfolio" className="inline-flex items-center gap-3 border border-white/30 px-5 py-4 text-xs font-bold tracking-[.08em] text-white transition hover:border-white hover:bg-white/10">{t('home.viewPortfolio')} <ArrowUpRight size={16}/></Link>
+-          </div>
+-        </Reveal>
++            <Link href="/portfolio" className="group inline-flex items-center gap-3 border border-white/30 px-5 py-4 text-xs font-bold tracking-[.08em] text-white transition-colors duration-300 hover:border-white hover:bg-white/10">{t('home.viewPortfolio')} <ArrowUpRight size={16} className="transition-transform duration-300 ease-out group-hover:-translate-y-0.5 group-hover:translate-x-0.5"/></Link>
++          </Reveal>
++        </div>
+         <div className="mt-10 grid max-w-4xl grid-cols-3 gap-2 font-mono-tech text-[9px] tracking-[.07em] text-white/55 sm:text-[10px] sm:tracking-[.12em]">
+           {['home.proofProjects', 'home.proofConstruction', 'home.proofInspection'].map((key, index) => (
+-            <span key={key} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2"><span className="text-gold-300">0{index + 1}</span><span className="whitespace-nowrap">{t(key)}</span></span>
++            <Reveal immediate delay={0.7 + index * 0.08} key={key} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2"><span className="text-gold-300">0{index + 1}</span><span className="whitespace-nowrap">{t(key)}</span></Reveal>
+           ))}
+         </div>
+-      </div>
++      </motion.div>
+     </section>
+ 
+     <section className="site-grid bg-cream-50 px-5 py-20 lg:px-10 lg:py-32">
+@@ -59,11 +73,11 @@ export default function Home() {
+ 
+     <section className="bg-graphite-950 px-5 py-20 text-off-white lg:px-10 lg:py-32">
+       <div className="mx-auto max-w-360">
+-        <div className="flex flex-col justify-between gap-7 md:flex-row md:items-end"><div><Label dark>{t('home.selectedWorks')}</Label><h2 className="max-w-2xl font-display text-4xl font-bold leading-[.95] tracking-[-.055em] sm:text-5xl">{t('home.worksTitle')}</h2></div><Link href="/portfolio" className="inline-flex items-center gap-2 border-b border-white/40 pb-2 text-xs font-bold tracking-[.08em] hover:border-gold-300 hover:text-gold-300">{t('home.allProjects')} <ArrowUpRight size={15}/></Link></div>
++        <Reveal className="flex flex-col justify-between gap-7 md:flex-row md:items-end"><div><Label dark>{t('home.selectedWorks')}</Label><h2 className="max-w-2xl font-display text-4xl font-bold leading-[.95] tracking-[-.055em] sm:text-5xl">{t('home.worksTitle')}</h2></div><Link href="/portfolio" className="inline-flex items-center gap-2 border-b border-white/40 pb-2 text-xs font-bold tracking-[.08em] hover:border-gold-300 hover:text-gold-300">{t('home.allProjects')} <ArrowUpRight size={15}/></Link></Reveal>
+         <div className="mt-14 grid gap-5 lg:grid-cols-12">
+           {PROJECTS.slice(0,3).map((project, i) => {
+             const title = t(`project.${project.slug}.title`);
+-            return <Link key={project.id} href={`/portfolio/${project.slug}`} className={`group block ${i === 0 ? 'lg:col-span-7' : 'lg:col-span-5'}`}><div className={`relative overflow-hidden bg-graphite-800 ${i === 0 ? 'h-[260px] sm:h-[340px] lg:h-102.5' : 'h-[220px] sm:h-63.75'}`}><Image src={project.images[0]} alt={t('common.projectImage', { title })} fill sizes={i === 0 ? '(min-width: 1024px) 58vw, 100vw' : '(min-width: 1024px) 42vw, 100vw'} className="project-image object-cover" /></div><div className="flex items-start justify-between border-b border-white/20 py-5"><div><p className="font-mono-tech text-[10px] tracking-[.13em] text-gold-300">{t(categoryKey(project.category)).toUpperCase()}</p><h3 className="mt-2 font-display text-2xl font-bold tracking-[-.04em]">{title}</h3><p className="mt-2 flex items-center gap-1.5 text-xs text-white/55"><MapPin size={13}/>{project.location}</p><p className="mt-2 text-xs text-white/45">{t('common.projectOwner')}: {project.client}</p></div><ArrowUpRight className="mt-1 text-gold-300" size={20}/></div></Link>;
++            return <Link key={project.id} href={`/portfolio/${project.slug}`} className={`group block ${i === 0 ? 'lg:col-span-7' : 'lg:col-span-5'}`}><ScrollImage className={`relative bg-graphite-800 ${i === 0 ? 'h-[260px] sm:h-[340px] lg:h-102.5' : 'h-[220px] sm:h-63.75'}`}><Image src={project.images[0]} alt={t('common.projectImage', { title })} fill sizes={i === 0 ? '(min-width: 1024px) 58vw, 100vw' : '(min-width: 1024px) 42vw, 100vw'} className="project-image object-cover" /></ScrollImage><div className="flex items-start justify-between border-b border-white/20 py-5"><div><p className="font-mono-tech text-[10px] tracking-[.13em] text-gold-300">{t(categoryKey(project.category)).toUpperCase()}</p><h3 className="mt-2 font-display text-2xl font-bold tracking-[-.04em]">{title}</h3><p className="mt-2 flex items-center gap-1.5 text-xs text-white/55"><MapPin size={13}/>{project.location}</p><p className="mt-2 text-xs text-white/45">{t('common.projectOwner')}: {project.client}</p></div><ArrowUpRight className="mt-1 text-gold-300 transition-transform duration-300 ease-out group-hover:-translate-y-0.5 group-hover:translate-x-0.5" size={20}/></div></Link>;
+           })}
+         </div>
+       </div>
+@@ -71,8 +85,8 @@ export default function Home() {
+ 
+     <section id="orcamento" className="bg-cream-100 px-5 py-20 lg:px-10 lg:py-32">
+         <div className="mx-auto grid max-w-310 gap-12 lg:grid-cols-[.85fr_1.15fr] lg:gap-24">
+-        <div className="group"><Label>{t('home.firstContact')}</Label><h2 className="font-display text-4xl font-bold leading-[.95] tracking-[-.055em] text-graphite-950 sm:text-5xl">{t('home.quoteTitle')}</h2><p className="mt-7 max-w-sm leading-relaxed text-graphite-600">{t('home.quoteDescription')}</p><div className="relative mt-12 h-48 w-full overflow-hidden sm:h-56"><Image src={SOBRE_IMAGE} alt={t('home.quoteImageAlt')} fill sizes="(min-width: 1024px) 34vw, 100vw" className="image-reveal-color object-cover" /></div><p className="mt-5 text-xs text-graphite-500">{COMPANY.legalName}</p></div>
+-        <div className="border-t-2 border-graphite-950 bg-cream-50 p-5 shadow-[10px_10px_0_#d6dbcf] sm:p-10 sm:shadow-[20px_20px_0_#d6dbcf]"><QuoteForm /></div>
++        <div className="group"><Reveal><Label>{t('home.firstContact')}</Label><h2 className="font-display text-4xl font-bold leading-[.95] tracking-[-.055em] text-graphite-950 sm:text-5xl">{t('home.quoteTitle')}</h2><p className="mt-7 max-w-sm leading-relaxed text-graphite-600">{t('home.quoteDescription')}</p></Reveal><ScrollImage className="relative mt-12 h-48 w-full sm:h-56"><Image src={SOBRE_IMAGE} alt={t('home.quoteImageAlt')} fill sizes="(min-width: 1024px) 34vw, 100vw" className="image-reveal-color object-cover" /></ScrollImage><p className="mt-5 text-xs text-graphite-500">{COMPANY.legalName}</p></div>
++        <Reveal delay={0.15} className="border-t-2 border-graphite-950 bg-cream-50 p-5 shadow-[10px_10px_0_#d6dbcf] sm:p-10 sm:shadow-[20px_20px_0_#d6dbcf]"><QuoteForm /></Reveal>
+       </div>
+     </section>
+   </main>;
+diff --git a/app/portfolio/[slug]/ProjectContent.jsx b/app/portfolio/[slug]/ProjectContent.jsx
+index 7c3e1bf..afd4eff 100644
+--- a/app/portfolio/[slug]/ProjectContent.jsx
++++ b/app/portfolio/[slug]/ProjectContent.jsx
+@@ -5,6 +5,7 @@ import Image from 'next/image';
+ import { ArrowLeft, MapPin, Building2, Users } from 'lucide-react';
+ import { GradientBlob, SectionEyebrow } from '@/components/DesignPrimitives';
+ import Reveal from '@/components/Reveal';
++import ScrollImage from '@/components/ScrollImage';
+ import { categoryKey } from '@/lib/i18n';
+ import { useT } from '@/components/LocaleProvider';
+ 
+@@ -32,9 +33,11 @@ export default function ProjectContent({ project }) {
+             </div>
+           </Reveal>
+ 
+-          <Reveal immediate delay={0.12}>
++          <Reveal immediate variant="mask" delay={0.15}>
+             <div className="relative aspect-4/3 overflow-hidden bg-graphite-900">
+-              <Image src={project.images[0]} alt={t('common.projectImage', { title })} fill priority sizes="(min-width: 1024px) 58vw, 100vw" className="object-cover" />
++              <ScrollImage reveal={false} className="absolute inset-0">
++                <Image src={project.images[0]} alt={t('common.projectImage', { title })} fill loading="eager" fetchPriority="high" sizes="(min-width: 1024px) 58vw, 100vw" className="object-cover" />
++              </ScrollImage>
+               <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-graphite-950/85 to-transparent px-5 pb-5 pt-16 text-xs text-white/80">{project.location}</div>
+             </div>
+           </Reveal>
+@@ -49,11 +52,9 @@ export default function ProjectContent({ project }) {
+           </Reveal>
+           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-12">
+             {project.images.map((src, index) => (
+-              <Reveal key={src} delay={index * 0.04} className={index === 0 ? 'sm:col-span-2 lg:col-span-7' : 'lg:col-span-5'}>
+-                <div className="relative aspect-4/3 h-full overflow-hidden bg-graphite-900">
+-                  <Image src={src} alt={t('common.projectGalleryImage', { title, number: index + 1 })} fill sizes={index === 0 ? '(min-width: 1024px) 58vw, 100vw' : '(min-width: 1024px) 42vw, 100vw'} className="project-image object-cover" />
+-                </div>
+-              </Reveal>
++              <ScrollImage key={src} className={`relative aspect-4/3 h-full bg-graphite-900 ${index === 0 ? 'sm:col-span-2 lg:col-span-7' : 'lg:col-span-5'}`}>
++                <Image src={src} alt={t('common.projectGalleryImage', { title, number: index + 1 })} fill sizes={index === 0 ? '(min-width: 1024px) 58vw, 100vw' : '(min-width: 1024px) 42vw, 100vw'} className="project-image object-cover" />
++              </ScrollImage>
+             ))}
+           </div>
+         </div>
+diff --git a/app/portfolio/page.jsx b/app/portfolio/page.jsx
+index 5aeb4ac..32fffad 100644
+--- a/app/portfolio/page.jsx
++++ b/app/portfolio/page.jsx
+@@ -7,10 +7,13 @@ import { motion, AnimatePresence } from 'motion/react';
+ import { MapPin } from 'lucide-react';
+ import { TechFrame, GradientBlob, SectionEyebrow } from '@/components/DesignPrimitives';
+ import Reveal from '@/components/Reveal';
++import ScrollImage from '@/components/ScrollImage';
+ import { FILTERS, PROJECTS } from '@/lib/content';
+ import { useT } from '@/components/LocaleProvider';
+ import { categoryKey } from '@/lib/i18n';
+ 
++const EASE_OUT = [0.16, 1, 0.3, 1];
++
+ export default function PortfolioPage() {
+   const [filter, setFilter] = useState('Todos');
+   const t = useT();
+@@ -27,18 +30,23 @@ export default function PortfolioPage() {
+           </Reveal>
+ 
+           <Reveal immediate delay={0.15} className="mt-10 flex flex-wrap gap-2">
+-            {FILTERS.map((f) => (
+-              <button
+-                key={f}
+-                onClick={() => setFilter(f)}
+-                aria-pressed={filter === f}
+-                className={`min-h-11 rounded-[2px] border px-4 py-2.5 text-xs font-semibold tracking-tight transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 ${
+-                  filter === f ? 'border-gold-400 bg-gold-400 text-graphite-950' : 'border-graphite-950/15 text-graphite-600 hover:border-gold-400/50 hover:text-gold-600'
+-                }`}
+-              >
+-                {t(`portfolio.filters.${f === 'Todos' ? 'all' : f === 'Construção' ? 'construction' : 'rehabilitation'}`)}
+-              </button>
+-            ))}
++            {FILTERS.map((f) => {
++              const active = filter === f;
++              return (
++                <button
++                  key={f}
++                  onClick={() => setFilter(f)}
++                  aria-pressed={active}
++                  className={`relative isolate min-h-11 rounded-[2px] border px-4 py-2.5 text-xs font-semibold tracking-tight transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 ${
++                    active ? 'border-gold-400 text-graphite-950' : 'border-graphite-950/15 text-graphite-600 hover:border-gold-400/50 hover:text-gold-600'
++                  }`}
++                >
++                  {/* O fundo dourado desliza entre filtros em vez de saltar. */}
++                  {active && <motion.span layoutId="portfolio-filter" aria-hidden="true" className="absolute -inset-px -z-10 rounded-[2px] bg-gold-400" transition={{ type: 'spring', stiffness: 420, damping: 38 }} />}
++                  {t(`portfolio.filters.${f === 'Todos' ? 'all' : f === 'Construção' ? 'construction' : 'rehabilitation'}`)}
++                </button>
++              );
++            })}
+           </Reveal>
+           <p className="mt-4 text-xs text-graphite-500" aria-live="polite">
+             {t(visible.length === 1 ? 'portfolio.projectOne' : 'portfolio.projectsMany', { count: visible.length })}
+@@ -50,15 +58,29 @@ export default function PortfolioPage() {
+         <div className="mx-auto max-w-7xl">
+           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+             <AnimatePresence mode="popLayout">
+-              {visible.map((p) => {
++              {visible.map((p, i) => {
+                 const title = t(`project.${p.slug}.title`);
+                 return (
+-                  <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.4 }}>
++                  <motion.div
++                    key={p.id}
++                    layout
++                    initial={{ opacity: 0, y: 24 }}
++                    animate={{ opacity: 1, y: 0 }}
++                    exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2, ease: 'easeIn' } }}
++                    transition={{
++                      layout: { type: 'spring', stiffness: 300, damping: 36 },
++                      opacity: { duration: 0.45, delay: i * 0.05 },
++                      y: { duration: 0.7, ease: EASE_OUT, delay: i * 0.05 },
++                    }}
++                  >
+                     <Link href={`/portfolio/${p.slug}`} className="group block overflow-hidden rounded-[3px] border border-cream-200 bg-white transition-colors duration-300 hover:border-gold-400/60">
+-                    <div className="relative h-72 overflow-hidden bg-graphite-900">
+-                      <TechFrame className="pointer-events-none absolute inset-3 z-20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
++                    <ScrollImage
++                      parallax={6}
++                      className="relative h-72 bg-graphite-900"
++                      overlay={<TechFrame className="pointer-events-none absolute inset-3 z-20 scale-[1.04] opacity-0 transition-[opacity,scale] duration-500 ease-out group-hover:scale-100 group-hover:opacity-100" />}
++                    >
+                       <Image src={p.images[0]} alt={t('portfolio.projectImageAlt', { title })} fill sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="project-image object-cover" />
+-                    </div>
++                    </ScrollImage>
+                     <div className="p-6">
+                       <p className="font-mono-tech text-[11px] tracking-[0.15em] text-gold-600">{t(categoryKey(p.category)).toUpperCase()}</p>
+                       <h3 className="mt-1.5 font-display text-lg font-semibold text-graphite-950">{title}</h3>
+diff --git a/app/servicos/page.jsx b/app/servicos/page.jsx
+index f7182fe..f6f04e4 100644
+--- a/app/servicos/page.jsx
++++ b/app/servicos/page.jsx
+@@ -4,6 +4,7 @@ import Image from 'next/image';
+ import Link from 'next/link';
+ import { ArrowDown, ArrowUpRight } from 'lucide-react';
+ import Reveal from '@/components/Reveal';
++import ScrollImage from '@/components/ScrollImage';
+ import { useT } from '@/components/LocaleProvider';
+ import { SERVICES, PROJECTS } from '@/lib/content';
+ import { categoryKey } from '@/lib/i18n';
+@@ -24,14 +25,9 @@ function ProjectImage({ service, index, t }) {
+   const title = t(`project.${project.slug}.title`);
+ 
+   return (
+-    <div className="group relative aspect-4/3 overflow-hidden bg-graphite-800 lg:aspect-square">
+-      <Image
+-        src={image}
+-        alt={t('common.projectImage', { title })}
+-        fill
+-        sizes="(min-width: 1024px) 42vw, 100vw"
+-        className="project-image object-cover"
+-      />
++    <ScrollImage
++      className="group relative aspect-4/3 bg-graphite-800 lg:aspect-square"
++      overlay={<>
+       <div className="absolute inset-0 bg-linear-to-t from-graphite-950/75 via-transparent to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
+       <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 px-4 pb-4 text-[9px] font-medium tracking-[.15em] text-white sm:px-5 sm:pb-5">
+         <span className="flex min-w-0 items-center gap-2 font-mono-tech">
+@@ -42,7 +38,16 @@ function ProjectImage({ service, index, t }) {
+         </span>
+         <span className="shrink-0 font-mono-tech text-gold-300">0{index + 1}</span>
+       </div>
+-    </div>
++      </>}
++    >
++      <Image
++        src={image}
++        alt={t('common.projectImage', { title })}
++        fill
++        sizes="(min-width: 1024px) 42vw, 100vw"
++        className="project-image object-cover"
++      />
++    </ScrollImage>
+   );
+ }
+ 
+@@ -53,14 +58,17 @@ export default function ServicosPage() {
+   return (
+     <main>
+       <section className="relative isolate overflow-hidden bg-graphite-950 text-off-white">
+-        <Image
+-          src={heroProject.images[1]}
+-          alt={t('common.projectImage', { title: t(`project.${heroProject.slug}.title`) })}
+-          fill
+-          priority
+-          sizes="100vw"
+-          className="object-cover object-[58%_48%] opacity-70"
+-        />
++        <ScrollImage reveal={false} parallax={10} className="absolute inset-0">
++          <Image
++            src={heroProject.images[1]}
++            alt={t('common.projectImage', { title: t(`project.${heroProject.slug}.title`) })}
++            fill
++            loading="eager"
++            fetchPriority="high"
++            sizes="100vw"
++            className="hero-settle object-cover object-[58%_48%] opacity-70"
++          />
++        </ScrollImage>
+         <div className="absolute inset-0 bg-linear-to-b from-graphite-950/60 via-graphite-950/80 to-graphite-950 lg:bg-linear-to-r lg:from-graphite-950 lg:via-graphite-950/85 lg:to-graphite-950/20" />
+ 
+         <div className="relative mx-auto max-w-360 px-5 pb-0 pt-34 sm:px-8 lg:px-10 lg:pt-40">
+@@ -116,11 +124,11 @@ export default function ServicosPage() {
+               className={`scroll-mt-24 border-b border-graphite-950/10 px-5 py-14 sm:px-8 sm:py-20 lg:px-10 lg:py-24 ${index % 2 ? 'bg-cream-100' : 'bg-cream-50'}`}
+             >
+               <div className="mx-auto grid max-w-360 items-center gap-8 lg:grid-cols-2 lg:gap-16 xl:gap-24">
+-                <Reveal className={imageFirstOnDesktop ? '' : 'lg:order-2'}>
++                <div className={imageFirstOnDesktop ? '' : 'lg:order-2'}>
+                   <ProjectImage service={service} index={index} t={t} />
+-                </Reveal>
++                </div>
+ 
+-                <Reveal delay={0.06} className={imageFirstOnDesktop ? '' : 'lg:order-1'}>
++                <Reveal delay={0.18} className={imageFirstOnDesktop ? '' : 'lg:order-1'}>
+                   <article>
+                     <div className="mb-5 flex items-center gap-3 font-mono-tech text-[10px] font-medium tracking-[.16em] text-gold-600">
+                       <span>0{index + 1}</span><span className="h-px w-8 bg-gold-500/60" /><span>{t('services.scopeLabel')}</span>
+diff --git a/app/sobre/page.jsx b/app/sobre/page.jsx
+index 168e6ce..1887ee7 100644
+--- a/app/sobre/page.jsx
++++ b/app/sobre/page.jsx
+@@ -4,6 +4,7 @@ import Image from 'next/image';
+ import { UsersRound, BadgeCheck, CalendarCheck, ShieldCheck, ClipboardCheck, Broom, Scale } from 'lucide-react';
+ import { TechFrame, GradientBlob, SectionEyebrow } from '@/components/DesignPrimitives';
+ import Reveal from '@/components/Reveal';
++import ScrollImage from '@/components/ScrollImage';
+ import { COMPANY_PROFILE, PILLARS, SOBRE_IMAGE } from '@/lib/content';
+ import { useLocale, useT } from '@/components/LocaleProvider';
+ 
+@@ -30,12 +31,12 @@ export default function SobrePage() {
+       <section className="relative overflow-hidden bg-cream-100 px-6 py-24 lg:px-10">
+         <GradientBlob className="-left-32 top-0 h-72 w-72 bg-gold-500/10" />
+         <div className="relative mx-auto grid max-w-6xl gap-16 lg:grid-cols-2 lg:items-center">
+-          <Reveal>
+-            <TechFrame className="relative aspect-4/3 overflow-hidden border border-cream-200">
++          <TechFrame className="relative aspect-4/3 border border-cream-200">
++            <ScrollImage className="absolute inset-0">
+               <Image src={SOBRE_IMAGE} alt={t('about.imageAlt')} fill sizes="(min-width: 1024px) 42vw, 100vw" className="object-cover" />
+-            </TechFrame>
+-          </Reveal>
+-          <Reveal>
++            </ScrollImage>
++          </TechFrame>
++          <Reveal delay={0.15}>
+             <SectionEyebrow index={t('about.quality')} label={t('about.qualityLabel')} />
+             <h2 className="font-display text-3xl font-bold leading-[.98] tracking-[-.045em] text-graphite-950 sm:text-4xl">{t('about.qualityTitle')}</h2>
+             <p className="mt-6 leading-relaxed text-graphite-600">{t('about.qualityPolicy')}</p>
+diff --git a/components/GrainOverlay.jsx b/components/GrainOverlay.jsx
+index 03334e7..85ec573 100644
+--- a/components/GrainOverlay.jsx
++++ b/components/GrainOverlay.jsx
+@@ -1,10 +1,13 @@
++// Textura de grão renderizada uma vez como mosaico de 160px, em vez de um filtro SVG
++// a ocupar o ecrã inteiro — mesmo aspeto, bem menos trabalho para o browser.
++const NOISE_TILE = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
++
+ export default function GrainOverlay() {
+   return (
+-    <svg aria-hidden="true" className="pointer-events-none fixed inset-0 z-[999] h-full w-full opacity-[0.035] mix-blend-overlay">
+-      <filter id="grain">
+-        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" />
+-      </filter>
+-      <rect width="100%" height="100%" filter="url(#grain)" />
+-    </svg>
++    <div
++      aria-hidden="true"
++      className="pointer-events-none fixed inset-0 z-[999] opacity-[0.035] mix-blend-overlay"
++      style={{ backgroundImage: NOISE_TILE, backgroundSize: '160px 160px' }}
++    />
+   );
+ }
+diff --git a/components/LenisProvider.jsx b/components/LenisProvider.jsx
+index 25d1cf0..0ec87d8 100644
+--- a/components/LenisProvider.jsx
++++ b/components/LenisProvider.jsx
+@@ -2,8 +2,11 @@
+ 
+ import { useEffect, useRef } from 'react';
+ import Lenis from 'lenis';
++import { MotionConfig } from 'motion/react';
+ import LenisScrollContext from '@/components/LenisScrollContext';
+ 
++const easeOutExpo = (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
++
+ export default function LenisProvider({ children }) {
+   const scrollToRef = useRef(null);
+ 
+@@ -17,14 +20,26 @@ export default function LenisProvider({ children }) {
+       return () => { scrollToRef.current = null; };
+     }
+ 
+-    // autoRaf (Lenis 1.3+) cuida do próprio loop requestAnimationFrame — já não é preciso geri-lo à mão.
+-    const lenis = new Lenis({ duration: 1.1, easing: (t) => 1 - Math.pow(1 - t, 3), autoRaf: true });
+-    scrollToRef.current = (target, offset) => lenis.scrollTo(target, { offset, duration: 0.75 });
++    // lerp dá um scroll que acompanha a roda do rato sem atraso perceptível.
++    // anchors: os links "#secção" deslizam suavemente e respeitam o scroll-margin (scroll-mt-*).
++    // stopInertiaOnNavigate: ao mudar de página, a inércia pára em vez de arrastar a página nova.
++    const lenis = new Lenis({
++      lerp: 0.1,
++      autoRaf: true,
++      anchors: { duration: 1.1, easing: easeOutExpo },
++      stopInertiaOnNavigate: true,
++    });
++    scrollToRef.current = (target, offset) => lenis.scrollTo(target, { offset, duration: 0.9, easing: easeOutExpo });
+     return () => {
+       scrollToRef.current = null;
+       lenis.destroy();
+     };
+   }, []);
+ 
+-  return <LenisScrollContext.Provider value={scrollToRef}>{children}</LenisScrollContext.Provider>;
++  return (
++    <LenisScrollContext.Provider value={scrollToRef}>
++      {/* reducedMotion="user": todas as animações Motion respeitam a preferência do sistema. */}
++      <MotionConfig reducedMotion="user">{children}</MotionConfig>
++    </LenisScrollContext.Provider>
++  );
+ }
+diff --git a/components/Navbar.jsx b/components/Navbar.jsx
+index 9b6bca5..5f968a8 100644
+--- a/components/Navbar.jsx
++++ b/components/Navbar.jsx
+@@ -5,10 +5,18 @@ import Link from 'next/link';
+ import Image from 'next/image';
+ import { usePathname } from 'next/navigation';
+ import { Menu, X } from 'lucide-react';
++import { AnimatePresence, motion } from 'motion/react';
+ import { NAV_LINKS } from '@/lib/content';
+ import { useT } from '@/components/LocaleProvider';
+ import LanguageSwitcher from '@/components/LanguageSwitcher';
+ 
++const EASE_OUT = [0.16, 1, 0.3, 1];
++const menuList = { open: { transition: { staggerChildren: 0.045, delayChildren: 0.08 } } };
++const menuItem = {
++  closed: { opacity: 0, y: -8 },
++  open: { opacity: 1, y: 0, transition: { duration: 0.35, ease: EASE_OUT } },
++};
++
+ const navKeys = {
+   '/': 'nav.home',
+   '/sobre': 'nav.about',
+@@ -39,20 +47,41 @@ export default function Navbar() {
+     return () => window.removeEventListener('keydown', onKeyDown);
+   }, []);
+   return (
+-    <header className={`fixed inset-x-0 top-0 z-50 border-b text-off-white transition-all duration-500 ${isHome && !scrolled && !open ? 'border-transparent bg-graphite-950/20' : 'border-white/10 bg-graphite-950/95 shadow-[0_10px_35px_-22px_rgba(0,0,0,.7)]'} backdrop-blur-xl`}>
++    <header className={`fixed inset-x-0 top-0 z-50 border-b text-off-white transition-[background-color,border-color,box-shadow] duration-500 ease-out ${isHome && !scrolled && !open ? 'border-transparent bg-graphite-950/20' : 'border-white/10 bg-graphite-950/95 shadow-[0_10px_35px_-22px_rgba(0,0,0,.7)]'} backdrop-blur-xl`}>
+       <nav aria-label={t('nav.navigation')} className="mx-auto flex h-18 max-w-360 items-center justify-between px-5 lg:px-10">
+-        <Link href="/" onClick={close} aria-label={`Star Prime — ${t('nav.home')}`} className="flex shrink-0 items-center"><Image src="/StarPrime-LOGO.png" alt={t('common.logoAlt')} width={341} height={165} sizes="170px" priority className="h-12 w-auto object-contain sm:h-14" /></Link>
++        <Link href="/" onClick={close} aria-label={`Star Prime — ${t('nav.home')}`} className="flex shrink-0 items-center"><Image src="/StarPrime-LOGO.png" alt={t('common.logoAlt')} width={341} height={165} sizes="170px" loading="eager" className="h-12 w-auto object-contain sm:h-14" /></Link>
+         <div className="hidden items-center gap-7 md:flex">
+           {NAV_LINKS.map((item) => <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? 'page' : undefined} className={`nav-link rounded-sm text-[12px] font-semibold tracking-[.08em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 focus-visible:ring-offset-2 focus-visible:ring-offset-graphite-950 ${isActive(item.href) ? 'nav-link-active text-gold-300' : 'text-white/70 hover:text-white'}`}>{t(navKeys[item.href])}</Link>)}
+         </div>
+         <div className="ml-auto flex items-center gap-2 md:ml-0 md:gap-0">
+           <LanguageSwitcher />
+-          <button onClick={() => setOpen(!open)} aria-label={open ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={open} aria-controls="mobile-navigation" className="grid h-11 w-11 place-items-center rounded-sm border border-white/20 transition hover:border-gold-300 hover:text-gold-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 md:hidden">{open ? <X size={20} /> : <Menu size={21} />}</button>
++          <button onClick={() => setOpen(!open)} aria-label={open ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={open} aria-controls="mobile-navigation" className="grid h-11 w-11 place-items-center rounded-sm border border-white/20 transition hover:border-gold-300 hover:text-gold-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 md:hidden"><AnimatePresence mode="wait" initial={false}>
++            <motion.span key={open ? 'close' : 'open'} initial={{ opacity: 0, rotate: -60 }} animate={{ opacity: 1, rotate: 0 }} exit={{ opacity: 0, rotate: 60 }} transition={{ duration: 0.16 }} className="grid place-items-center">
++              {open ? <X size={20} /> : <Menu size={21} />}
++            </motion.span>
++          </AnimatePresence></button>
+         </div>
+       </nav>
+-      {open && <div id="mobile-navigation" className="border-t border-white/10 bg-graphite-950 px-5 pb-6 pt-3 md:hidden">
+-        {NAV_LINKS.map((item) => <Link key={item.href} href={item.href} onClick={close} aria-current={isActive(item.href) ? 'page' : undefined} className={`block border-b border-white/10 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 focus-visible:ring-inset ${isActive(item.href) ? 'text-gold-300' : 'text-white/85'}`}>{t(navKeys[item.href])}</Link>)}
+-      </div>}
++      <AnimatePresence initial={false}>
++        {open && (
++          <motion.div
++            key="mobile-navigation"
++            id="mobile-navigation"
++            initial={{ height: 0, opacity: 0 }}
++            animate={{ height: 'auto', opacity: 1, transition: { height: { duration: 0.45, ease: EASE_OUT }, opacity: { duration: 0.25 } } }}
++            exit={{ height: 0, opacity: 0, transition: { height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.2 } } }}
++            className="overflow-hidden border-t border-white/10 bg-graphite-950 md:hidden"
++          >
++            <motion.div variants={menuList} initial="closed" animate="open" className="px-5 pb-6 pt-3">
++              {NAV_LINKS.map((item) => (
++                <motion.div key={item.href} variants={menuItem}>
++                  <Link href={item.href} onClick={close} aria-current={isActive(item.href) ? 'page' : undefined} className={`block border-b border-white/10 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 focus-visible:ring-inset ${isActive(item.href) ? 'text-gold-300' : 'text-white/85'}`}>{t(navKeys[item.href])}</Link>
++                </motion.div>
++              ))}
++            </motion.div>
++          </motion.div>
++        )}
++      </AnimatePresence>
+     </header>
+   );
+ }
+diff --git a/components/QuoteForm.jsx b/components/QuoteForm.jsx
+index b74885b..a0faaf8 100644
+--- a/components/QuoteForm.jsx
++++ b/components/QuoteForm.jsx
+@@ -9,8 +9,17 @@ import LenisScrollContext from '@/components/LenisScrollContext';
+ import { OBRA_TYPES, DIMENSOES } from '@/lib/content';
+ import { useT } from '@/components/LocaleProvider';
+ 
++const EASE_OUT = [0.16, 1, 0.3, 1];
++// Os passos entram pelo lado para onde o utilizador avança (ou recua).
++const stepMotion = {
++  enter: (direction) => ({ opacity: 0, x: direction * 24 }),
++  center: { opacity: 1, x: 0, transition: { duration: 0.45, ease: EASE_OUT } },
++  exit: (direction) => ({ opacity: 0, x: direction * -16, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }),
++};
++
+ export default function QuoteForm() {
+   const [step, setStep] = useState(1);
++  const [direction, setDirection] = useState(1);
+   const [submitted, setSubmitted] = useState(false);
+   const [notificationWarning, setNotificationWarning] = useState(false);
+   const [sending, setSending] = useState(false);
+@@ -52,9 +61,13 @@ export default function QuoteForm() {
+   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
+   const next = () => {
+     setError('');
++    setDirection(1);
+     setStep((s) => Math.min(s + 1, 3));
+   };
+-  const back = () => setStep((s) => Math.max(s - 1, 1));
++  const back = () => {
++    setDirection(-1);
++    setStep((s) => Math.max(s - 1, 1));
++  };
+ 
+   async function handleSubmit(e) {
+     e.preventDefault();
+@@ -85,6 +98,7 @@ export default function QuoteForm() {
+         throw new Error(t(errorKey));
+       }
+ 
++      const result = await response.json().catch(() => ({}));
+       setNotificationWarning(result.notificationStatus === 'failed');
+       setSubmitted(true);
+     } catch (submitError) {
+@@ -96,14 +110,14 @@ export default function QuoteForm() {
+ 
+   if (submitted) {
+     return (
+-      <div className="flex flex-col items-center gap-4 py-10 text-center" role="status" aria-live="polite">
+-        <CircleCheck className="text-gold-500" size={40} />
++      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE_OUT }} className="flex flex-col items-center gap-4 py-10 text-center" role="status" aria-live="polite">
++        <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 380, damping: 22, delay: 0.1 }}><CircleCheck className="text-gold-500" size={40} /></motion.span>
+         <h3 className="font-display text-2xl font-semibold text-graphite-950">{t('quote.successTitle')}</h3>
+         <p className="max-w-sm text-graphite-600">{t('quote.successDescription')}</p>
+         {notificationWarning && <p role="alert" className="max-w-sm text-sm leading-relaxed text-graphite-600">{t('quote.notificationFailed')}</p>}
+         {!notificationWarning && <p className="max-w-sm text-sm leading-relaxed text-graphite-600">{t('quote.whatsappAlternative')}</p>}
+         <WhatsAppButton className="mt-2">{t('quote.openWhatsApp')}</WhatsAppButton>
+-      </div>
++      </motion.div>
+     );
+   }
+ 
+@@ -116,17 +130,17 @@ export default function QuoteForm() {
+       <nav className="mb-8 flex items-center gap-2 font-mono-tech text-xs text-graphite-950/35" aria-label={t('quote.progress')}>
+         {[1, 2, 3].map((n) => (
+           <div key={n} className="flex items-center gap-2">
+-            <span aria-current={step === n ? 'step' : undefined} className={`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] ${step >= n ? 'border-gold-500 bg-gold-400/10 text-gold-600' : 'border-graphite-950/15'}`}>{n}</span>
+-            {n < 3 && <span className="h-px w-8 bg-graphite-950/10" />}
++            <span aria-current={step === n ? 'step' : undefined} className={`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] transition-colors duration-500 ${step >= n ? 'border-gold-500 bg-gold-400/10 text-gold-600' : 'border-graphite-950/15'}`}>{n}</span>
++            {n < 3 && <span className="relative h-px w-8 overflow-hidden bg-graphite-950/10"><span className="absolute inset-0 origin-left bg-gold-500 transition-transform duration-500 ease-out" style={{ transform: `scaleX(${step > n ? 1 : 0})` }} /></span>}
+           </div>
+         ))}
+       </nav>
+ 
+       {error && <p role="alert" className="mb-6 border-l-2 border-red-700 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-900">{error}</p>}
+ 
+-      <AnimatePresence mode="wait">
++      <AnimatePresence mode="wait" initial={false} custom={direction}>
+         {step === 1 && (
+-          <motion.div key="s1" initial={false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
++          <motion.div key="s1" custom={direction} variants={stepMotion} initial="enter" animate="center" exit="exit">
+             <fieldset>
+               <legend className="mb-4 text-sm font-semibold text-graphite-700">{t('quote.workQuestion')}</legend>
+             <div className="flex flex-wrap gap-2">
+@@ -136,7 +150,7 @@ export default function QuoteForm() {
+                   key={type}
+                   onClick={() => { update('tipoObra', type); next(); }}
+                   aria-pressed={data.tipoObra === type}
+-                  className={`min-h-11 rounded-xs border px-4 py-3 text-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 ${data.tipoObra === t ? 'border-gold-500 bg-gold-400 text-graphite-950' : 'border-graphite-950/15 text-graphite-700 hover:border-graphite-950/40 hover:bg-white'}`}
++                  className={`min-h-11 rounded-xs border px-4 py-3 text-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 ${data.tipoObra === type ? 'border-gold-500 bg-gold-400 text-graphite-950' : 'border-graphite-950/15 text-graphite-700 hover:border-graphite-950/40 hover:bg-white'}`}
+                 >
+                   {t(`quote.workTypes.${index}`)}
+                 </button>
+@@ -147,7 +161,7 @@ export default function QuoteForm() {
+         )}
+ 
+         {step === 2 && (
+-          <motion.div key="s2" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-5">
++          <motion.div key="s2" custom={direction} variants={stepMotion} initial="enter" animate="center" exit="exit" className="space-y-5">
+             <div>
+               <label htmlFor="localizacao" className="mb-2 block text-sm font-semibold text-graphite-700">{t('quote.location')}</label>
+               <input
+@@ -190,7 +204,7 @@ export default function QuoteForm() {
+         )}
+ 
+         {step === 3 && (
+-          <motion.div key="s3" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-5">
++          <motion.div key="s3" custom={direction} variants={stepMotion} initial="enter" animate="center" exit="exit" className="space-y-5">
+             <div>
+               <label htmlFor="nome" className="mb-2 block text-sm font-semibold text-graphite-700">{t('quote.name')}</label>
+               <input
+diff --git a/components/Reveal.jsx b/components/Reveal.jsx
+index 48609d4..370062b 100644
+--- a/components/Reveal.jsx
++++ b/components/Reveal.jsx
+@@ -1,20 +1,36 @@
+ 'use client';
+ 
+-import { motion, useReducedMotion } from 'motion/react';
++import { useRef } from 'react';
++import { motion, useScroll } from 'motion/react';
++import { useScrollValue } from '@/components/useScrollMotion';
+ 
+-export default function Reveal({ children, className = '', delay = 0, immediate = false }) {
+-  const reducedMotion = useReducedMotion();
+-  const visible = { opacity: 1, y: 0 };
++/**
++ * Entrada de texto e blocos.
++ * - immediate: anima no carregamento da página (hero), em CSS, sem esperar pelo JavaScript.
++ * - caso contrário: acompanha o scroll — o bloco sobe e aparece à medida que entra no ecrã,
++ *   e volta a recuar se o utilizador subir. `delay` desfasa a entrada de elementos vizinhos.
++ */
++export default function Reveal({ children, className = '', delay = 0, immediate = false, variant = 'fade' }) {
++  if (immediate) {
++    return (
++      <div data-reveal={variant} data-reveal-load="" style={delay ? { '--reveal-delay': `${delay}s` } : undefined} className={className}>
++        {children}
++      </div>
++    );
++  }
++  return <ScrollReveal className={className} delay={delay}>{children}</ScrollReveal>;
++}
++
++function ScrollReveal({ children, className, delay }) {
++  const ref = useRef(null);
++  // Cada 0,1 s de "delay" atrasa a entrada 4 % da altura do ecrã.
++  const shift = Math.min(delay, 0.5) * 0.4;
++  const { scrollYProgress } = useScroll({ target: ref, offset: [`start ${1 - shift}`, `start ${0.72 - shift}`] });
++  const opacity = useScrollValue(scrollYProgress, [0, 1], [0, 1], 1);
++  const y = useScrollValue(scrollYProgress, [0, 1], [56, 0], 0);
+ 
+   return (
+-    <motion.div
+-      initial={reducedMotion ? false : { opacity: 0, y: 28 }}
+-      animate={immediate ? visible : undefined}
+-      whileInView={immediate ? undefined : visible}
+-      viewport={immediate ? undefined : { once: true, margin: '-80px' }}
+-      transition={reducedMotion ? { duration: 0 } : { duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
+-      className={className}
+-    >
++    <motion.div ref={ref} data-reveal="scroll" style={{ opacity, y }} className={className}>
+       {children}
+     </motion.div>
+   );
+diff --git a/components/ScrollImage.jsx b/components/ScrollImage.jsx
+new file mode 100644
+index 0000000..8cfa7e2
+--- /dev/null
++++ b/components/ScrollImage.jsx
+@@ -0,0 +1,41 @@
++'use client';
++
++import { useRef } from 'react';
++import { motion, useScroll } from 'motion/react';
++import { useScrollValue } from '@/components/useScrollMotion';
++
++/**
++ * Imagem que acompanha o scroll:
++ * - reveal: a moldura abre-se de fora para dentro à medida que a imagem entra no ecrã;
++ * - a fotografia aproxima-se (zoom) durante a entrada;
++ * - parallax: depois continua a deslizar mais devagar do que a página.
++ * Tudo é reversível — ao subir, a animação recua.
++ *
++ * `children` é a camada que se move (normalmente o <Image fill />);
++ * `overlay` fica fixo por cima (gradientes, legendas, molduras).
++ */
++export default function ScrollImage({ children, overlay = null, className = '', reveal = true, parallax = 8 }) {
++  const ref = useRef(null);
++  const { scrollYProgress: passage } = useScroll({ target: ref, offset: ['start end', 'end start'] });
++  const { scrollYProgress: entry } = useScroll({ target: ref, offset: ['start 1', 'start 0.45'] });
++
++  // A escala final cobre o deslocamento do parallax, para nunca aparecer uma margem vazia.
++  const baseScale = 1 + (parallax * 2.2) / 100;
++  const y = useScrollValue(passage, [0, 1], [`${-parallax}%`, `${parallax}%`], '0%');
++  const scale = useScrollValue(entry, [0, 1], [reveal ? baseScale + 0.22 : baseScale, baseScale], 1);
++  const clipPath = useScrollValue(
++    entry,
++    [0, 0.9],
++    reveal ? ['inset(14% 10% 14% 10%)', 'inset(0% 0% 0% 0%)'] : ['inset(0% 0% 0% 0%)', 'inset(0% 0% 0% 0%)'],
++    'inset(0% 0% 0% 0%)',
++  );
++
++  return (
++    <motion.div ref={ref} data-reveal="image" style={{ clipPath }} className={`overflow-hidden ${className}`}>
++      <motion.div className="absolute inset-0 will-change-transform" style={{ y, scale }}>
++        {children}
++      </motion.div>
++      {overlay}
++    </motion.div>
++  );
++}
+diff --git a/components/WhatsAppButton.jsx b/components/WhatsAppButton.jsx
+index bb520cd..a10ae34 100644
+--- a/components/WhatsAppButton.jsx
++++ b/components/WhatsAppButton.jsx
+@@ -13,13 +13,13 @@ export default function WhatsAppButton({ children, className = '' }) {
+       href={getWhatsAppLink(locale)}
+       target="_blank"
+       rel="noreferrer"
+-      whileHover={{ scale: 1.045, y: -2 }}
+-      whileTap={{ scale: 0.97 }}
+-      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+-      className={`inline-flex min-h-12 items-center justify-center gap-3 rounded-[2px] bg-gold-400 px-6 py-3 text-[11px] font-bold tracking-[0.09em] text-graphite-950 transition-colors duration-200 hover:bg-gold-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 ${className}`}
++      whileHover={{ y: -2 }}
++      whileTap={{ y: 0, scale: 0.98 }}
++      transition={{ type: 'spring', stiffness: 520, damping: 34 }}
++      className={`group inline-flex min-h-12 items-center justify-center gap-3 rounded-[2px] bg-gold-400 px-6 py-3 text-[11px] font-bold tracking-[0.09em] text-graphite-950 transition-colors duration-200 hover:bg-gold-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 ${className}`}
+     >
+       {children}
+-      <ArrowUpRight size={16} />
++      <ArrowUpRight size={16} aria-hidden="true" className="transition-transform duration-300 ease-out group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+     </motion.a>
+   );
+ }
+diff --git a/components/useScrollMotion.js b/components/useScrollMotion.js
+new file mode 100644
+index 0000000..c06650d
+--- /dev/null
++++ b/components/useScrollMotion.js
+@@ -0,0 +1,17 @@
++'use client';
++
++import { useRef } from 'react';
++import { useReducedMotion, useTransform } from 'motion/react';
++
++/**
++ * Como useTransform, mas devolve o valor "neutro" quando o utilizador pede menos movimento.
++ * Os motion values estão sempre ligados (o HTML do servidor e do cliente coincidem);
++ * só o resultado muda, por isso não há conteúdo preso a meio de uma animação.
++ */
++export function useScrollValue(progress, input, output, neutral) {
++  const reduceMotion = useReducedMotion();
++  const reduceRef = useRef(reduceMotion);
++  reduceRef.current = reduceMotion;
++  const mapped = useTransform(progress, input, output);
++  return useTransform(() => (reduceRef.current ? neutral : mapped.get()));
++}
